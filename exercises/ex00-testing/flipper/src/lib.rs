@@ -12,11 +12,10 @@ pub mod pallet {
 
 	#[pallet::config]
 	pub trait Config: frame_system::Config {
-		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
+		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 	}
 
 	#[pallet::pallet]
-	#[pallet::generate_store(pub(super) trait Store)]
 	pub struct Pallet<T>(_);
 
 	// The pallet's runtime storage items.
@@ -51,7 +50,8 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> {
 		/// This function sets a value to the Value storage and emits an event, it should be used
 		/// once, if something is already present in the storage, it returns an error.
-		#[pallet::weight(0)]
+		#[pallet::call_index(0)]
+		#[pallet::weight(Weight::default())]
 		pub fn set_value(origin: OriginFor<T>, value: bool) -> DispatchResult {
 			// Checks that the extrinsic is signed and gets the signer.
 			// This function will return an error if the extrinsic isn't signed.
@@ -77,7 +77,8 @@ pub mod pallet {
 
 		/// This function flips the value and emits an event, if there is no value in the storage
 		/// then it returns an error.
-		#[pallet::weight(0)]
+		#[pallet::call_index(1)]
+		#[pallet::weight(Weight::default())]
 		pub fn flip_value(origin: OriginFor<T>) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
