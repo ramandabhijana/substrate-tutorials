@@ -20,14 +20,13 @@ pub mod pallet {
 	#[pallet::config]
 	pub trait Config: frame_system::Config {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
-		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
+		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
 		#[pallet::constant]
 		type MaxLength: Get<u32>;
 	}
 
 	#[pallet::pallet]
-	#[pallet::generate_store(pub(super) trait Store)]
 	pub struct Pallet<T>(_);
 
 	// The pallet's runtime storage items.
@@ -115,7 +114,8 @@ pub mod pallet {
 	// Dispatchable functions must be annotated with a weight and must return a DispatchResult.
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		#[pallet::weight(0)]
+		#[pallet::call_index(0)]
+		#[pallet::weight(Weight::default())]
 		pub fn create(origin: OriginFor<T>) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 
@@ -133,7 +133,8 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::weight(0)]
+		#[pallet::call_index(1)]
+		#[pallet::weight(Weight::default())]
 		pub fn set_metadata(
 			origin: OriginFor<T>,
 			asset_id: AssetId,
@@ -151,7 +152,8 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::weight(0)]
+		#[pallet::call_index(2)]
+		#[pallet::weight(Weight::default())]
 		pub fn mint(
 			origin: OriginFor<T>,
 			asset_id: AssetId,
@@ -183,7 +185,8 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::weight(0)]
+		#[pallet::call_index(3)]
+		#[pallet::weight(Weight::default())]
 		pub fn burn(origin: OriginFor<T>, asset_id: AssetId, amount: u128) -> DispatchResult {
 			// TODO:
 			// - Ensure the extrinsic origin is a signed transaction.
@@ -194,7 +197,8 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::weight(0)]
+		#[pallet::call_index(4)]
+		#[pallet::weight(Weight::default())]
 		pub fn transfer(
 			origin: OriginFor<T>,
 			asset_id: AssetId,
