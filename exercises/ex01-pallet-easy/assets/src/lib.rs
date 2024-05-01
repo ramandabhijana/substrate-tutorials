@@ -20,14 +20,13 @@ pub mod pallet {
 	#[pallet::config]
 	pub trait Config: frame_system::Config {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
-		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
+		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
 		#[pallet::constant]
 		type MaxLength: Get<u32>;
 	}
 
 	#[pallet::pallet]
-	#[pallet::generate_store(pub(super) trait Store)]
 	pub struct Pallet<T>(_);
 
 	// The pallet's runtime storage items.
@@ -115,7 +114,8 @@ pub mod pallet {
 	// Dispatchable functions must be annotated with a weight and must return a DispatchResult.
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		#[pallet::weight(0)]
+		#[pallet::call_index(0)]
+		#[pallet::weight(Weight::default())]
 		pub fn create(origin: OriginFor<T>) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 
@@ -133,7 +133,8 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::weight(0)]
+		#[pallet::call_index(1)]
+		#[pallet::weight(Weight::default())]
 		pub fn set_metadata(
 			origin: OriginFor<T>,
 			asset_id: AssetId,
@@ -148,10 +149,19 @@ pub mod pallet {
 			// - Insert this metadata in the Metadata storage, under the asset_id key.
 			// - Deposit a `MetadataSet` event.
 
+			let metadata = types::AssetMetadata::new(name.clone(), symbol.clone());
+			Metadata::<T>::insert(asset_id, metadata);
+			Self::deposit_event(Event::<T>::MetadataSet {
+				asset_id,
+				name,
+				symbol,
+			});
+
 			Ok(())
 		}
 
-		#[pallet::weight(0)]
+		#[pallet::call_index(2)]
+		#[pallet::weight(Weight::default())]
 		pub fn mint(
 			origin: OriginFor<T>,
 			asset_id: AssetId,
@@ -162,14 +172,21 @@ pub mod pallet {
 			// - Ensure the extrinsic origin is a signed transaction.
 			// - Ensure the caller is the asset owner.
 
+			let origin = ensure_signed(origin)?;
+			Self::ensure_is_owner(asset_id, origin)?;
+
 			let mut minted_amount = 0;
+			let mut total_supply = 0;
 
 			Asset::<T>::try_mutate(asset_id, |maybe_details| -> DispatchResult {
 				let details = maybe_details.as_mut().ok_or(Error::<T>::UnknownAssetId)?;
 
 				let old_supply = details.supply;
 				details.supply = details.supply.saturating_add(amount);
-				minted_amount = details.supply - old_supply;
+
+				total_supply = details.supply;
+
+				minted_amount = total_supply - old_supply;
 
 				Ok(())
 			})?;
@@ -180,10 +197,17 @@ pub mod pallet {
 
 			// TODO: Deposit a `Minted` event.
 
+			Self::deposit_event(Event::<T>::Minted {
+				asset_id,
+				owner: to,
+				total_supply,
+			});
+
 			Ok(())
 		}
 
-		#[pallet::weight(0)]
+		#[pallet::call_index(3)]
+		#[pallet::weight(Weight::default())]
 		pub fn burn(origin: OriginFor<T>, asset_id: AssetId, amount: u128) -> DispatchResult {
 			// TODO:
 			// - Ensure the extrinsic origin is a signed transaction.
@@ -191,10 +215,39 @@ pub mod pallet {
 			// - Mutate the account balance.
 			// - Emit a `Burned` event.
 
+			let origin = ensure_signed(origin)?;
+
+			let mut total_supply = 0;
+
+			Asset::<T>::try_mutate(asset_id, |details| -> DispatchResult {
+				let details = details.as_mut().ok_or(Error::<T>::UnknownAssetId)?;
+
+				let mut burned_amount = 0;
+
+				Account::<T>::mutate(asset_id, origin.clone(), |balance| {
+					let old_balance = *balance;
+					*balance = balance.saturating_sub(amount);
+					burned_amount = old_balance - *balance;
+				});
+
+				details.supply -= burned_amount;
+
+				total_supply = details.supply;
+
+				Ok(())
+			})?;
+
+			Self::deposit_event(Event::Burned {
+				asset_id,
+				owner: origin,
+				total_supply,
+			});
+
 			Ok(())
 		}
 
-		#[pallet::weight(0)]
+		#[pallet::call_index(4)]
+		#[pallet::weight(Weight::default())]
 		pub fn transfer(
 			origin: OriginFor<T>,
 			asset_id: AssetId,
@@ -205,6 +258,28 @@ pub mod pallet {
 			// - Ensure the extrinsic origin is a signed transaction.
 			// - Mutate both account balances.
 			// - Emit a `Transferred` event.
+			let origin = ensure_signed(origin)?;
+
+			ensure!(Self::asset(asset_id).is_some(), Error::<T>::UnknownAssetId);
+
+			let mut transferred_amount = 0;
+
+			Account::<T>::mutate(asset_id, origin.clone(), |balance| {
+				let old_balance = *balance;
+				*balance = balance.saturating_sub(amount);
+				transferred_amount = old_balance - *balance;
+			});
+
+			Account::<T>::mutate(asset_id, to.clone(), |balance| {
+				*balance = balance.saturating_add(transferred_amount);
+			});
+
+			Self::deposit_event(Event::Transferred {
+				asset_id,
+				from: origin,
+				to,
+				amount,
+			});
 
 			Ok(())
 		}
