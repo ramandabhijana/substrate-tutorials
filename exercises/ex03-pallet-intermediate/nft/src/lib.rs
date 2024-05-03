@@ -9,7 +9,7 @@ pub use pallet::*;
 mod tests;
 pub mod types;
 
-use frame_support::ensure;
+use frame_support::{ensure, sp_runtime::traits::Zero};
 use types::*;
 
 #[frame_support::pallet]
@@ -94,12 +94,62 @@ pub mod pallet {
 			metadata: BoundedVec<u8, T::MaxLength>,
 			supply: u128,
 		) -> DispatchResult {
+			let origin = ensure_signed(origin)?;
+
+			ensure!(!supply.is_zero(), Error::<T>::NoSupply);
+
+			let id = Self::nonce();
+
+			let details =
+				UniqueAssetDetails::<T, T::MaxLength>::new(origin.clone(), metadata, supply);
+
+			UniqueAsset::<T>::insert(id, details);
+
+			Account::<T>::insert(id, origin.clone(), supply);
+
+			Nonce::<T>::set(id.saturating_add(1));
+
+			Self::deposit_event(Event::Created {
+				creator: origin,
+				asset_id: id,
+			});
+
 			Ok(())
 		}
 
 		#[pallet::call_index(1)]
 		#[pallet::weight(Weight::default())]
 		pub fn burn(origin: OriginFor<T>, asset_id: UniqueAssetId, amount: u128) -> DispatchResult {
+			let origin = ensure_signed(origin)?;
+
+			let mut total_supply = 0;
+
+			UniqueAsset::<T>::try_mutate(asset_id, |details| -> DispatchResult {
+				let details = details.as_mut().ok_or(Error::<T>::UnknownAssetId)?;
+
+				Self::ensure_own_some(asset_id, origin.clone())?;
+
+				let mut burned_amount = 0;
+
+				Account::<T>::mutate(asset_id, origin.clone(), |owned_amount| {
+					let old_amount = *owned_amount;
+					*owned_amount = owned_amount.saturating_sub(amount);
+					burned_amount = old_amount - *owned_amount;
+				});
+
+				details.supply -= burned_amount;
+
+				total_supply = details.supply;
+
+				Ok(())
+			})?;
+
+			Self::deposit_event(Event::Burned {
+				asset_id,
+				owner: origin,
+				total_supply,
+			});
+
 			Ok(())
 		}
 
@@ -111,7 +161,45 @@ pub mod pallet {
 			amount: u128,
 			to: T::AccountId,
 		) -> DispatchResult {
+			let origin = ensure_signed(origin)?;
+
+			ensure!(
+				Self::unique_asset(asset_id).is_some(),
+				Error::<T>::UnknownAssetId
+			);
+
+			Self::ensure_own_some(asset_id, origin.clone())?;
+
+			let mut transferred_amount = 0;
+
+			Account::<T>::mutate(asset_id, origin.clone(), |owned_amount| {
+				let old_amount = *owned_amount;
+				*owned_amount = owned_amount.saturating_sub(amount);
+				transferred_amount = old_amount - *owned_amount;
+			});
+
+			Account::<T>::mutate(asset_id, to.clone(), |owned_amount| {
+				*owned_amount = owned_amount.saturating_add(transferred_amount);
+			});
+
+			Self::deposit_event(Event::Transferred {
+				asset_id,
+				from: origin,
+				to,
+				amount: transferred_amount,
+			});
+
 			Ok(())
 		}
+	}
+}
+
+impl<T: Config> Pallet<T> {
+	fn ensure_own_some(asset_id: UniqueAssetId, account: T::AccountId) -> Result<(), Error<T>> {
+		ensure!(
+			!Self::account(asset_id, account).is_zero(),
+			Error::<T>::NotOwned
+		);
+		Ok(())
 	}
 }
