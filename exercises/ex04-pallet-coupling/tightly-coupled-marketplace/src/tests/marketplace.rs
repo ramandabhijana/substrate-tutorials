@@ -82,52 +82,58 @@ mod buy {
 	#[test]
 	fn ok() {
 		let bob_funds = 2000;
-		ExtBuilder::default().balances(vec![(BOB, bob_funds)]).build().execute_with(|| {
-			create_nft(5);
-			let price = 1000;
-			assert_ok!(Marketplace::set_sale(
-				RuntimeOrigin::signed(ALICE),
-				0,
-				price,
-				2
-			));
+		ExtBuilder::default()
+			.balances(vec![(BOB, bob_funds), (ALICE, 0)])
+			.build()
+			.execute_with(|| {
+				create_nft(5);
+				let price = 1000;
+				assert_ok!(Marketplace::set_sale(
+					RuntimeOrigin::signed(ALICE),
+					0,
+					price,
+					2
+				));
 
-			assert_ok!(Marketplace::buy(RuntimeOrigin::signed(BOB), 0, ALICE, 1));
+				assert_ok!(Marketplace::buy(RuntimeOrigin::signed(BOB), 0, ALICE, 1));
 
-			assert_eq!(bob_funds - price, Balances::free_balance(BOB));
-			assert_eq!(price, Balances::free_balance(ALICE));
-			assert_eq!(amount_owned(0, ALICE), 4);
-			assert_eq!(amount_owned(0, BOB), 1);
-		})
+				assert_eq!(bob_funds - price, Balances::free_balance(BOB));
+				assert_eq!(price, Balances::free_balance(ALICE));
+				assert_eq!(amount_owned(0, ALICE), 4);
+				assert_eq!(amount_owned(0, BOB), 1);
+			})
 	}
 
 	#[test]
 	fn ok_multiple() {
 		let bob_funds = 2000;
-		ExtBuilder::default().balances(vec![(BOB, bob_funds)]).build().execute_with(|| {
-			create_nft(5);
-			let price = 1000;
-			assert_ok!(Marketplace::set_sale(
-				RuntimeOrigin::signed(ALICE),
-				0,
-				price,
-				2
-			));
+		ExtBuilder::default()
+			.balances(vec![(BOB, bob_funds), (ALICE, 0)])
+			.build()
+			.execute_with(|| {
+				create_nft(5);
+				let price = 1000;
+				assert_ok!(Marketplace::set_sale(
+					RuntimeOrigin::signed(ALICE),
+					0,
+					price,
+					2
+				));
 
-			let amount_buy = 2;
-			let total_price = amount_buy * price;
-			assert_ok!(Marketplace::buy(
-				RuntimeOrigin::signed(BOB),
-				0,
-				ALICE,
-				amount_buy
-			));
+				let amount_buy = 2;
+				let total_price = amount_buy * price;
+				assert_ok!(Marketplace::buy(
+					RuntimeOrigin::signed(BOB),
+					0,
+					ALICE,
+					amount_buy
+				));
 
-			assert_eq!(bob_funds - total_price, Balances::free_balance(BOB));
-			assert_eq!(total_price, Balances::free_balance(ALICE));
-			assert_eq!(amount_owned(0, ALICE), 3);
-			assert_eq!(amount_owned(0, BOB), 2);
-		})
+				assert_eq!(bob_funds - total_price, Balances::free_balance(BOB));
+				assert_eq!(total_price, Balances::free_balance(ALICE));
+				assert_eq!(amount_owned(0, ALICE), 3);
+				assert_eq!(amount_owned(0, BOB), 2);
+			})
 	}
 
 	#[test]

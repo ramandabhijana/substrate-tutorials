@@ -74,7 +74,8 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		#[pallet::weight(0)]
+		#[pallet::call_index(0)]
+		#[pallet::weight(Weight::default())]
 		pub fn set_sale(
 			origin: OriginFor<T>,
 			nft_id: T::ResourceId,
@@ -84,9 +85,9 @@ pub mod pallet {
 			let origin = ensure_signed(origin)?;
 
 			ensure!(amount > 0, Error::<T>::ZeroAmount);
-			let owned: u128 = todo!(
-				"get the amount of this specific NFT owned by the seller, through the Resource type and its Sellable trait"
-			);
+
+			let owned = T::Resource::amount_owned(nft_id, origin.clone());
+
 			ensure!(owned >= amount, Error::<T>::NotEnoughOwned);
 
 			ResourcesForSale::<T>::insert(nft_id, origin.clone(), SaleData { price, amount });
@@ -96,7 +97,8 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::weight(0)]
+		#[pallet::call_index(1)]
+		#[pallet::weight(Weight::default())]
 		pub fn buy(
 			origin: OriginFor<T>,
 			nft_id: T::ResourceId,
@@ -106,9 +108,8 @@ pub mod pallet {
 			let buyer = ensure_signed(origin)?;
 
 			let sale_data = ResourcesForSale::<T>::get(nft_id, seller.clone());
-			let owned = todo!(
-				"get the amount of this specific NFT owned by the seller, through the Resource type and its Sellable trait"
-			);
+
+			let owned = T::Resource::amount_owned(nft_id, seller.clone());
 
 			ensure!(amount <= sale_data.amount, Error::<T>::NotEnoughInSale);
 			ensure!(sale_data.amount <= owned, Error::<T>::NotEnoughOwned);
@@ -118,9 +119,9 @@ pub mod pallet {
 				.checked_mul(&amount.checked_into().ok_or(Error::<T>::Overflow)?)
 				.ok_or(Error::<T>::Overflow)?;
 
-			todo!("transfer the amount of currency owed from the buyer to the seller");
+			T::Currency::transfer(&buyer, &seller, total_to_pay, KeepAlive)?;
 
-			todo!("transfer amount of nft_id from the seller to the buyer");
+			T::Resource::transfer(nft_id, seller.clone(), buyer.clone(), amount);
 
 			if amount == sale_data.amount {
 				ResourcesForSale::<T>::remove(nft_id, seller.clone());

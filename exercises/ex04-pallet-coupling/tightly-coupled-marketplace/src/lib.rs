@@ -16,18 +16,17 @@ use types::*;
 pub type BalanceOf<T> =
 	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
-// TODO: Once you added the dependecy to pallet_marketplace_nft use T::NFTId instead
-pub type NFTId = u32;
-
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
 	use frame_support::pallet_prelude::*;
 	use frame_system::{ensure_signed, pallet_prelude::*};
+	use pallet_marketplace_nfts::types::Sellable;
 
 	#[pallet::config]
-	// TODO: add a dependency on pallet_marketplace_nft on the previous line
-	pub trait Config: frame_system::Config + scale_info::TypeInfo {
+	pub trait Config:
+		frame_system::Config + scale_info::TypeInfo + pallet_marketplace_nfts::Config
+	{
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 		type Currency: Currency<Self::AccountId>;
 	}
@@ -39,9 +38,9 @@ pub mod pallet {
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
 		/// NFT has been listed for sale (nft_id, seller, price, amount)
-		ListedForSale(NFTId, T::AccountId, BalanceOf<T>, u128),
+		ListedForSale(T::NFTId, T::AccountId, BalanceOf<T>, u128),
 		// NFT has been sold (nft_id, seller, buyer, amount)
-		Sold(NFTId, T::AccountId, T::AccountId, u128),
+		Sold(T::NFTId, T::AccountId, T::AccountId, u128),
 	}
 
 	#[pallet::error]
@@ -58,7 +57,7 @@ pub mod pallet {
 	pub type NFTsForSale<T: Config> = StorageDoubleMap<
 		_,
 		Blake2_128Concat,
-		NFTId,
+		T::NFTId,
 		Blake2_128Concat,
 		T::AccountId,
 		SaleData<T>,
@@ -67,18 +66,18 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		#[pallet::weight(0)]
+		#[pallet::call_index(0)]
+		#[pallet::weight(Weight::default())]
 		pub fn set_sale(
 			origin: OriginFor<T>,
-			nft_id: NFTId,
+			nft_id: T::NFTId,
 			price: BalanceOf<T>,
 			amount: u128,
 		) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 
 			ensure!(amount > 0, Error::<T>::ZeroAmount);
-			// TODO: get the amount owned from the pallet_nft account storage, instead of 0
-			let owned = 0;
+			let owned = pallet_marketplace_nfts::Pallet::<T>::account(nft_id, origin.clone());
 			ensure!(owned >= amount, Error::<T>::NotEnoughOwned);
 
 			NFTsForSale::<T>::insert(nft_id, origin.clone(), SaleData { price, amount });
@@ -88,17 +87,18 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::weight(0)]
+		#[pallet::call_index(1)]
+		#[pallet::weight(Weight::default())]
 		pub fn buy(
 			origin: OriginFor<T>,
-			nft_id: NFTId,
+			nft_id: T::NFTId,
 			seller: T::AccountId,
 			amount: u128,
 		) -> DispatchResult {
 			let buyer = ensure_signed(origin)?;
 
 			let sale_data = NFTsForSale::<T>::get(nft_id, seller.clone());
-			let owned = todo!("get the amount owned from the pallet_nft account storage");
+			let owned = pallet_marketplace_nfts::Pallet::<T>::account(nft_id, seller.clone());
 
 			ensure!(amount <= sale_data.amount, Error::<T>::NotEnoughInSale);
 			ensure!(sale_data.amount <= owned, Error::<T>::NotEnoughOwned);
@@ -110,7 +110,12 @@ pub mod pallet {
 
 			<T as pallet::Config>::Currency::transfer(&buyer, &seller, total_to_pay, KeepAlive)?;
 
-			todo!("call the pallet_marketplace_nft transfer function");
+			pallet_marketplace_nfts::Pallet::<T>::unchecked_transfer(
+				nft_id,
+				seller.clone(),
+				buyer.clone(),
+				amount,
+			);
 
 			if amount == sale_data.amount {
 				NFTsForSale::<T>::remove(nft_id, seller.clone());
