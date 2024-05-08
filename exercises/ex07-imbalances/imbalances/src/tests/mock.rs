@@ -1,9 +1,10 @@
 use crate as pallet_imbalance;
-use frame_support::parameter_types;
+use frame_support::{derive_impl, parameter_types};
 use sp_core::H256;
 use sp_runtime::{
 	testing::Header,
 	traits::{BlakeTwo256, IdentityLookup},
+	BuildStorage,
 };
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<TestRuntime>;
@@ -11,15 +12,12 @@ type Block = frame_system::mocking::MockBlock<TestRuntime>;
 
 // Configure a mock runtime to test the pallet.
 frame_support::construct_runtime!(
-	pub enum TestRuntime where
-		Block = Block,
-		NodeBlock = Block,
-		UncheckedExtrinsic = UncheckedExtrinsic,
+	pub enum TestRuntime
 	{
 		System: frame_system,
 		Balances: pallet_balances,
 
-		Imbalances: pallet_imbalance::{Pallet, Call, Storage, Event<T>},
+		Imbalances: pallet_imbalance,
 	}
 );
 
@@ -28,27 +26,26 @@ parameter_types! {
 	pub const SS58Prefix: u8 = 42;
 }
 
+#[derive_impl(frame_system::config_preludes::TestDefaultConfig as frame_system::DefaultConfig)]
 impl frame_system::Config for TestRuntime {
 	type AccountData = pallet_balances::AccountData<u128>;
 	type AccountId = u64;
 	type BaseCallFilter = frame_support::traits::Everything;
 	type BlockHashCount = BlockHashCount;
 	type BlockLength = ();
-	type BlockNumber = u64;
 	type BlockWeights = ();
-	type Call = Call;
+	type RuntimeCall = RuntimeCall;
 	type DbWeight = ();
-	type Event = Event;
+	type RuntimeEvent = RuntimeEvent;
 	type Hash = H256;
 	type Hashing = BlakeTwo256;
-	type Header = Header;
-	type Index = u64;
+	type Block = Block;
 	type Lookup = IdentityLookup<Self::AccountId>;
 	type MaxConsumers = frame_support::traits::ConstU32<16>;
 	type OnKilledAccount = ();
 	type OnNewAccount = ();
 	type OnSetCode = ();
-	type Origin = Origin;
+	type RuntimeOrigin = RuntimeOrigin;
 	type PalletInfo = PalletInfo;
 	type SS58Prefix = SS58Prefix;
 	type SystemWeightInfo = ();
@@ -61,18 +58,23 @@ parameter_types! {
 	pub const ExistentialDeposit: u128 = EXISTENTIAL_DEPOSIT;
 	pub const MaxLocks: u32 = 50;
 	pub const MaxReserves: u32 = 50;
+	pub const MaxFreezes: u32 = 100;
 }
 
 impl pallet_balances::Config for TestRuntime {
 	type AccountStore = System;
 	type Balance = u128;
 	type DustRemoval = ();
-	type Event = Event;
+	type RuntimeEvent = RuntimeEvent;
 	type ExistentialDeposit = ExistentialDeposit;
 	type MaxLocks = MaxLocks;
 	type MaxReserves = MaxReserves;
 	type ReserveIdentifier = [u8; 8];
 	type WeightInfo = ();
+	type RuntimeHoldReason = ();
+	type RuntimeFreezeReason = ();
+	type FreezeIdentifier = ();
+	type MaxFreezes = MaxFreezes;
 }
 
 pub const TREASURY_FLAT_CUT: u128 = 50;
@@ -84,7 +86,7 @@ parameter_types! {
 
 impl pallet_imbalance::Config for TestRuntime {
 	type Currency = Balances;
-	type Event = Event;
+	type RuntimeEvent = RuntimeEvent;
 	type TreasuryAccount = TreasuryAccount;
 	type TreasuryFlatCut = TreasuryFlatCut;
 }
@@ -109,7 +111,7 @@ impl ExtBuilder {
 	}
 
 	pub fn build(self) -> sp_io::TestExternalities {
-		let mut t = frame_system::GenesisConfig::default().build_storage::<TestRuntime>().unwrap();
+		let mut t = frame_system::GenesisConfig::<TestRuntime>::default().build_storage().unwrap();
 
 		pallet_balances::GenesisConfig::<TestRuntime> {
 			balances: self.caps_endowed_accounts,
