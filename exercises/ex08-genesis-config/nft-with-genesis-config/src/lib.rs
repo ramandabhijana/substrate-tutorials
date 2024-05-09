@@ -9,7 +9,7 @@ pub use pallet::*;
 mod tests;
 pub mod types;
 
-use frame_support::{ensure, BoundedVec};
+use frame_support::{ensure, traits::BuildGenesisConfig, BoundedVec};
 use types::*;
 
 type GenesisAssetList<T> = Vec<(
@@ -27,7 +27,7 @@ pub mod pallet {
 
 	#[pallet::config]
 	pub trait Config: frame_system::Config + scale_info::TypeInfo {
-		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
+		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
 		#[pallet::constant]
 		type MaxLength: Get<u32>;
@@ -47,7 +47,7 @@ pub mod pallet {
 	}
 
 	#[pallet::genesis_build]
-	impl<T: Config> GenesisBuild<T> for GenesisConfig<T> {
+	impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
 		fn build(&self) {
 			// TODO
 			// iterate over the `GenesisAssetList` and:
@@ -57,7 +57,6 @@ pub mod pallet {
 	}
 
 	#[pallet::pallet]
-	#[pallet::generate_store(pub(super) trait Store)]
 	pub struct Pallet<T>(_);
 
 	#[pallet::storage]
