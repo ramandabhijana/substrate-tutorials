@@ -9,7 +9,7 @@ pub use pallet::*;
 mod tests;
 pub mod types;
 
-use frame_support::{ensure, BoundedVec};
+use frame_support::{ensure, traits::BuildGenesisConfig, BoundedVec};
 use types::*;
 
 type GenesisAssetList<T> = Vec<(
@@ -27,7 +27,7 @@ pub mod pallet {
 
 	#[pallet::config]
 	pub trait Config: frame_system::Config + scale_info::TypeInfo {
-		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
+		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
 		#[pallet::constant]
 		type MaxLength: Get<u32>;
@@ -47,17 +47,35 @@ pub mod pallet {
 	}
 
 	#[pallet::genesis_build]
-	impl<T: Config> GenesisBuild<T> for GenesisConfig<T> {
+	impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
 		fn build(&self) {
 			// TODO
 			// iterate over the `GenesisAssetList` and:
 			// 1) mint each asset
 			// 2) transfer the correct amount of this asset to each account in the inner vec
+			for (creator, metadata, supply, owners) in self.genesis_asset_list.iter() {
+				let bounded_metadata: BoundedVec<u8, T::MaxLength> =
+					metadata.clone().try_into().unwrap();
+
+				let _ = Pallet::<T>::inner_mint(creator.clone(), bounded_metadata, supply.clone())
+					.expect("mint asset should success");
+
+				let asset_id = Pallet::<T>::nonce() - 1;
+
+				for (recipient, amount) in owners.iter() {
+					let _ = Pallet::<T>::inner_transfer(
+						asset_id,
+						creator.clone(),
+						recipient.clone(),
+						*amount,
+					)
+					.expect("transfer should success");
+				}
+			}
 		}
 	}
 
 	#[pallet::pallet]
-	#[pallet::generate_store(pub(super) trait Store)]
 	pub struct Pallet<T>(_);
 
 	#[pallet::storage]
@@ -118,7 +136,8 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		#[pallet::weight(0)]
+		#[pallet::call_index(0)]
+		#[pallet::weight(Weight::default())]
 		pub fn mint(
 			origin: OriginFor<T>,
 			metadata: BoundedVec<u8, T::MaxLength>,
@@ -131,7 +150,8 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::weight(0)]
+		#[pallet::call_index(1)]
+		#[pallet::weight(Weight::default())]
 		pub fn burn(origin: OriginFor<T>, asset_id: UniqueAssetId, amount: u128) -> DispatchResult {
 			let origin = ensure_signed(origin)?;
 
@@ -168,7 +188,8 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::weight(0)]
+		#[pallet::call_index(2)]
+		#[pallet::weight(Weight::default())]
 		pub fn transfer(
 			origin: OriginFor<T>,
 			asset_id: UniqueAssetId,
