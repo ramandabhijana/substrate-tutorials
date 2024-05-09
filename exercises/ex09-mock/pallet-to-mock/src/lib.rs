@@ -9,8 +9,8 @@ use frame_support::{
 
 // TODO: Uncomment the following lines and fill the tests/mock.rs file
 // in order for the tests to compile and run successfully
-// #[cfg(test)]
-// mod tests;
+#[cfg(test)]
+mod tests;
 
 pub type BalanceOf<T> =
 	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
@@ -23,7 +23,7 @@ pub mod pallet {
 
 	#[pallet::config]
 	pub trait Config: frame_system::Config {
-		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
+		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
 		type Currency: Currency<Self::AccountId>;
 
@@ -34,7 +34,6 @@ pub mod pallet {
 	}
 
 	#[pallet::pallet]
-	#[pallet::generate_store(pub(super) trait Store)]
 	pub struct Pallet<T>(_);
 
 	#[pallet::event]

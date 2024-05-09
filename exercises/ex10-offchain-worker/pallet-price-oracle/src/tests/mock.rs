@@ -1,5 +1,5 @@
 use crate as pallet_price_oracle;
-use frame_support::parameter_types;
+use frame_support::{derive_impl, parameter_types};
 use sp_core::H256;
 use sp_runtime::{
 	testing::{Header, TestXt},
@@ -8,17 +8,14 @@ use sp_runtime::{
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<TestRuntime>;
 type Block = frame_system::mocking::MockBlock<TestRuntime>;
-pub type Extrinsic = TestXt<Call, ()>;
+pub type Extrinsic = TestXt<RuntimeCall, ()>;
 
 // Configure a mock runtime to test the pallet.
 frame_support::construct_runtime!(
-	pub enum TestRuntime where
-		Block = Block,
-		NodeBlock = Block,
-		UncheckedExtrinsic = UncheckedExtrinsic,
+	pub enum TestRuntime
 	{
-		System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
-		PriceOracle: pallet_price_oracle::{Pallet, Call, Storage, Event<T>},
+		System: frame_system,
+		PriceOracle: pallet_price_oracle,
 	}
 );
 
@@ -27,27 +24,26 @@ parameter_types! {
 	pub const SS58Prefix: u8 = 42;
 }
 
+#[derive_impl(frame_system::config_preludes::TestDefaultConfig as frame_system::DefaultConfig)]
 impl frame_system::Config for TestRuntime {
 	type AccountData = ();
 	type AccountId = sp_core::sr25519::Public;
 	type BaseCallFilter = frame_support::traits::Everything;
 	type BlockHashCount = ConstU64<250>;
 	type BlockLength = ();
-	type BlockNumber = u64;
 	type BlockWeights = ();
-	type Call = Call;
+	type RuntimeCall = RuntimeCall;
 	type DbWeight = ();
-	type Event = Event;
+	type RuntimeEvent = RuntimeEvent;
 	type Hash = H256;
 	type Hashing = BlakeTwo256;
-	type Header = Header;
-	type Index = u64;
 	type Lookup = IdentityLookup<Self::AccountId>;
+	type Block = Block;
 	type MaxConsumers = ConstU32<16>;
 	type OnKilledAccount = ();
 	type OnNewAccount = ();
 	type OnSetCode = ();
-	type Origin = Origin;
+	type RuntimeOrigin = RuntimeOrigin;
 	type PalletInfo = PalletInfo;
 	type SS58Prefix = ();
 	type SystemWeightInfo = ();
@@ -55,14 +51,14 @@ impl frame_system::Config for TestRuntime {
 }
 
 impl pallet_price_oracle::Config for TestRuntime {
-	type Call = Call;
-	type Event = Event;
+	type Call = RuntimeCall;
+	type RuntimeEvent = RuntimeEvent;
 }
 
 impl<C> frame_system::offchain::SendTransactionTypes<C> for TestRuntime
 where
-	Call: From<C>,
+	RuntimeCall: From<C>,
 {
 	type Extrinsic = Extrinsic;
-	type OverarchingCall = Call;
+	type OverarchingCall = RuntimeCall;
 }
